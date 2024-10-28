@@ -67,7 +67,7 @@ def step(action, obs):
                         [0,1,0,0,0,-zc/g]])
 
     x0 = 5
-    y0 = 0.02
+    y0 = 0.0
     action = action*10
     stateTemp = np.zeros(6,dtype=np.float32)
     stateTemp[0] = x0
@@ -86,9 +86,9 @@ def step(action, obs):
 
 
 vx = 0.6
-timepoint = 5
+timepoint = 0
 
-obs = np.array([0.2,0.1,1,1,vx,timepoint],dtype=np.float32)
+obs = np.array([0,0,0,0,vx,timepoint],dtype=np.float32)
 
 action,_ = model.predict(obs)
 
@@ -102,13 +102,15 @@ plt.plot(x,y)
 plt.show()
 
 
-# for _ in range(200):
-#     action, _ = model.predict(obs)
-#     obs, reward, done, truncated, info = env.step(action)
-#     rewards.append(reward)
-#     print(action)
 
-# plot_rewards(rewards)
+rewards = []
+for _ in range(200):
+    action, _ = model.predict(obs)
+    obs, reward, done, truncated, info = env.step(action)
+    rewards.append(reward)
+    print(action)
 
-# print(model.policy.action_net)
+plot_rewards(rewards)
+
+print(model.policy.action_net)
 
