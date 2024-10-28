@@ -9,7 +9,7 @@ import os
 current_file_path = __file__
 absolute_path = os.path.dirname(current_file_path)
 
-
+np.random.seed(0)
 
 def plot_rewards(rewards, title="Reward Over Time"):
     """
@@ -38,7 +38,7 @@ policy_kwargs = dict(
 model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1)
 
 # 加载 .pth 文件中的参数
-load_path = absolute_path+"/../models/zmpModel.pth"
+load_path = absolute_path+"/../models/zmpModel1.pth"
 model.policy.load_state_dict(torch.load(load_path))
 
 
@@ -86,7 +86,7 @@ def step(action, obs):
 
 
 vx = 0.6
-timepoint = 0
+timepoint = 1
 
 obs = np.array([0,0,0,0,vx,timepoint],dtype=np.float32)
 
@@ -97,6 +97,9 @@ state_horizon = step(action, obs)
 
 x = state_horizon[0::6]
 y = state_horizon[1::6]
+x = np.concatenate([[state_horizon[6*i]] for i in range(10)])
+y = np.concatenate([[state_horizon[6*i+1]] for i in range(10)])
+
 
 plt.plot(x,y)
 plt.show()

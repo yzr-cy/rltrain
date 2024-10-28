@@ -55,7 +55,7 @@ class zmpEnv(gym.Env):
         self.state_Horizon = np.zeros(6*self.h, dtype=np.float32)
         self.zmp_Horizon = np.zeros(2*self.h, dtype=np.float32)
         self.vx_des = 0
-        self.eposide = 100
+        self.eposide = 500
         self.count = 0
 
     def _get_obs(self):
@@ -108,27 +108,41 @@ class zmpEnv(gym.Env):
         rewards += self._reward_zmpTrace()
         rewards += self._reward_action(action)
         rewards += self._reward_posFoot()
+
+        TenState_reward = self._reward_faraway()
+        rewards += TenState_reward
+
         self.count+=1
         if self.count > self.eposide:
             truncated = True
         else:
             truncated = False
 
+
+        if -TenState_reward > 50:
+            endEpisode = True
+            rewards-=10000
+        else:
+            endEpisode = False
+
         self.vx_des += np.random.uniform(-0.1,0.1)
-        return self._get_obs(), rewards, False, truncated, {}
+        return self._get_obs(), rewards, endEpisode, truncated, {}
 
 
     def _reward_zmpTrace(self):
-        return -(np.linalg.norm(self.footStep - self.zmp_Horizon))
+        return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))
 
     def _reward_action(self, action):
         return -np.linalg.norm(action)
     
     def _reward_posFoot(self):
-        pos_horizon = self.state_Horizon[0::3]
-        return -np.linalg.norm(self.footStep - pos_horizon)
+        pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
+        return np.exp(-np.linalg.norm(self.footStep - pos_horizon))
         
-
+    def _reward_faraway(self):
+        TenState =np.concatenate([self._agent_state[:2] for _ in range(10)])
+        pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
+        return -np.linalg.norm(pos_horizon - TenState)
     
     def generate_Foot(self):
         self.footStep = np.zeros(self.h*2, dtype=np.float32)
