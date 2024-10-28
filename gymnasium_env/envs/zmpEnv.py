@@ -167,7 +167,7 @@ if __name__ == "__main__":
     )
 
 
-    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log="/home/cyh/myLibrary/MPC2/scripts/gymnasium_env/tensorboard/")
+    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= absolute_path+"/../tensorboard/")
 
     model.learn(total_timesteps=200)
 
