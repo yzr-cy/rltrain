@@ -133,14 +133,14 @@ class zmpEnv(gym.Env):
 
 
     def _reward_zmpTrace(self):
-        return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))*100
+        return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))
 
     def _reward_action(self, action):
         return -np.linalg.norm(action)
     
     def _reward_posFoot(self):
         pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
-        return np.exp(-np.linalg.norm(self.footStep - pos_horizon))
+        return np.exp(-np.linalg.norm(self.footStep - pos_horizon))*1000
         
     def _reward_faraway(self):
         TenState =np.concatenate([self._agent_state[:2] for _ in range(10)])
