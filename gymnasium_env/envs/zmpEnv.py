@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= absolute_path+"/../tensorboard/")
 
-    model.learn(total_timesteps=3000000)
+    model.learn(total_timesteps=6000000)
 
     save_path = absolute_path+"/../models/zmpModel.pth"
 
