@@ -110,7 +110,10 @@ class zmpEnv(gym.Env):
         rewards += self._reward_posFoot()
 
         TenState_reward = self._reward_faraway()
-        rewards += TenState_reward
+        rewards += TenState_reward*0.1
+
+        rewards += self._reward_velTrace()
+
 
         self.count+=1
         if self.count > self.eposide:
@@ -130,7 +133,7 @@ class zmpEnv(gym.Env):
 
 
     def _reward_zmpTrace(self):
-        return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))
+        return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))*100
 
     def _reward_action(self, action):
         return -np.linalg.norm(action)
@@ -143,6 +146,11 @@ class zmpEnv(gym.Env):
         TenState =np.concatenate([self._agent_state[:2] for _ in range(10)])
         pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
         return -np.linalg.norm(pos_horizon - TenState)
+    
+    def _reward_velTrace(self):
+        vel_des = np.concatenate([np.array([self.vx_des,0]) for _ in range(10)])
+        vel_state = np.concatenate([self.state_Horizon[6*i+2:6*i+4] for i in range(10)])
+        return np.exp(-np.linalg.norm(vel_des - vel_state))*1000
     
     def generate_Foot(self):
         self.footStep = np.zeros(self.h*2, dtype=np.float32)

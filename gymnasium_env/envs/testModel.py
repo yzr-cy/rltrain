@@ -38,7 +38,7 @@ policy_kwargs = dict(
 model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1)
 
 # 加载 .pth 文件中的参数
-load_path = absolute_path+"/../models/zmpModel1.pth"
+load_path = absolute_path+"/../models/zmpModel.pth"
 model.policy.load_state_dict(torch.load(load_path))
 
 
@@ -86,7 +86,7 @@ def step(action, obs):
 
 
 vx = 0.6
-timepoint = 1
+timepoint = 8
 
 obs = np.array([0,0,0,0,vx,timepoint],dtype=np.float32)
 
