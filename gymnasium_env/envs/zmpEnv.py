@@ -57,6 +57,7 @@ class zmpEnv(gym.Env):
         self.vx_des = 0
         self.eposide = 500
         self.count = 0
+        self.endEpisode = False
 
     def _get_obs(self):
         obs = np.zeros(6,dtype=np.float32)
@@ -80,9 +81,15 @@ class zmpEnv(gym.Env):
         
         self.timePoint = np.random.randint(0,self.h)
 
-        self.vx_des = np.random.uniform(low=-1,high=1)
+        self.vx_max = 1.0
+
+        self.vy_max = 1.0
+
+        self.vx_des = np.random.uniform(low=-self.vx_max,high=self.vx_max)
 
         self.count = 0
+
+        self.endEpisode = False
         
         return self._get_obs(),{}
     
@@ -123,13 +130,19 @@ class zmpEnv(gym.Env):
 
 
         if -TenState_reward > 50:
-            endEpisode = True
+            self.endEpisode = True
             rewards-=10000
         else:
-            endEpisode = False
+            self.endEpisode = False
 
         self.vx_des += np.random.uniform(-0.1,0.1)
-        return self._get_obs(), rewards, endEpisode, truncated, {}
+        
+        while self.vx_des > self.vx_max-0.2:
+            self.vx_des -= 0.1
+        while self.vx_des < -self.vx_max-0.2:
+            self.vx_des += 0.1
+
+        return self._get_obs(), rewards, self.endEpisode, truncated, {}
 
 
     def _reward_zmpTrace(self):
@@ -140,7 +153,7 @@ class zmpEnv(gym.Env):
     
     def _reward_posFoot(self):
         pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
-        return np.exp(-np.linalg.norm(self.footStep - pos_horizon))*1000
+        return np.exp(-np.linalg.norm(self.footStep - pos_horizon))
         
     def _reward_faraway(self):
         TenState =np.concatenate([self._agent_state[:2] for _ in range(10)])
@@ -150,7 +163,7 @@ class zmpEnv(gym.Env):
     def _reward_velTrace(self):
         vel_des = np.concatenate([np.array([self.vx_des,0]) for _ in range(10)])
         vel_state = np.concatenate([self.state_Horizon[6*i+2:6*i+4] for i in range(10)])
-        return np.exp(-np.linalg.norm(vel_des - vel_state))*1000
+        return np.exp(-np.linalg.norm(vel_des - vel_state))
     
     def generate_Foot(self):
         self.footStep = np.zeros(self.h*2, dtype=np.float32)
@@ -160,6 +173,9 @@ class zmpEnv(gym.Env):
             y = self._agent_state[1]
             vx = self._agent_state[2]
             vy = self._agent_state[3]
+            if np.abs(vx) > self.vx_max or np.abs(vy) > self.vy_max:
+                self.endEpisode = True
+
             vx_des = self.vx_des
             if i > 0:
                 if self.timeArray[(i+self.timePoint)%self.h] != self.timeArray[(i-1+self.timePoint)%self.h]:
