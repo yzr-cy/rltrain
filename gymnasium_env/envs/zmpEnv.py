@@ -112,12 +112,12 @@ class zmpEnv(gym.Env):
         
         self._agent_state = self.state_Horizon[:6]
         rewards = 0
-        rewards += self._reward_zmpTrace()
+        rewards += self._reward_zmpTrace()*0
         rewards += self._reward_action(action)
-        rewards += self._reward_posFoot()
+        rewards += self._reward_posFoot()*0
 
         TenState_reward = self._reward_faraway()
-        rewards += TenState_reward*0.1
+        rewards += TenState_reward*0
 
         rewards += self._reward_velTrace()
 
@@ -131,7 +131,7 @@ class zmpEnv(gym.Env):
 
         if -TenState_reward > 50:
             self.endEpisode = True
-            rewards-=10000
+            rewards-=100
         else:
             self.endEpisode = False
 
