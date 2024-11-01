@@ -70,8 +70,8 @@ class zmpEnv(gym.Env):
 
     def _get_obs(self):
         obs = np.zeros(6,dtype=np.float32)
-        obs[0] = self._agent_state[2] + np.random.uniform(-0.2,0.2)
-        obs[1] = self._agent_state[3] + np.random.uniform(-0.2,0.2)
+        obs[0] = self._agent_state[2]
+        obs[1] = self._agent_state[3]
         obs[2] = self._agent_state[4]
         obs[3] = self._agent_state[5] 
         obs[4] = self.vx_des
@@ -208,8 +208,8 @@ class zmpEnv(gym.Env):
                 self.footStep[i*2] = self.stand_pos[0]
                 self.footStep[i*2+1] = self.stand_pos[1]
             else:
-                self.footStep[i*2] = x + vx*self.trajT/2*k + self.K_step*(vx - vx_des)
-                self.footStep[i*2+1] = self.hipWidth*(self.timeArray[(i+self.timePoint)%self.h]) + y + vy*self.trajT/2*k + self.K_step*(vy)
+                self.footStep[i*2] = x + vx_des*self.trajT/2*k + self.K_step*(vx - vx_des)*0
+                self.footStep[i*2+1] = self.hipWidth*(self.timeArray[(i+self.timePoint)%self.h]) + y + vy*self.trajT/2*k*0 + self.K_step*(vy)*0
 
             self.foot_draw.append(np.array([self.footStep[i*2], self.footStep[i*2+1]]))
 

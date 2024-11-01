@@ -8,7 +8,7 @@
             "program": "/home/user/rltrain/gymnasium_env/envs/getOnxx.py",
             "console": "integratedTerminal",
             "args": [
-                "/home/user/rltrain/gymnasium_env/models/20241101-231143/zmpModel_900000.0.pth"
+                "/home/user/rltrain/gymnasium_env/models/20241102-001709/zmpModel_720000.0.pth"
             ]
         },
         {
@@ -18,7 +18,7 @@
             "program": "/home/user/rltrain/gymnasium_env/envs/play.py",
             "console": "integratedTerminal",
             "args": [
-                "/home/user/rltrain/gymnasium_env/models/20241101-231143/zmpModel_900000.0.pth"
+                "/home/user/rltrain/gymnasium_env/models/20241102-001709/zmpModel_720000.0.pth"
             ]
         },
         {
