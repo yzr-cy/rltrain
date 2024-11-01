@@ -3,24 +3,15 @@ import numpy as np
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
-
 import matplotlib.pyplot as plt
-
 import torch.nn as nn
-
 import torch
-
 import os
-
 import pygame
-
 from pynput import keyboard
-
 import threading
+from datetime import datetime
 
-current_file_path = __file__
-absolute_path = os.path.dirname(current_file_path)
-render_enabled = True
 
 
 
@@ -68,7 +59,7 @@ class zmpEnv(gym.Env):
         self.count = 0
         self.endEpisode = False
         self.window_size_h = 1024
-        self.window_size_w = 512*3
+        self.window_size_w = 512*4
         self.render_mode = "human"
         self.window = None
         self.clock = None
@@ -77,8 +68,8 @@ class zmpEnv(gym.Env):
 
     def _get_obs(self):
         obs = np.zeros(6,dtype=np.float32)
-        obs[0] = self._agent_state[1]
-        obs[1] = self._agent_state[2]
+        obs[0] = self._agent_state[2]
+        obs[1] = self._agent_state[3]
         obs[2] = self._agent_state[4]
         obs[3] = self._agent_state[5]
         obs[4] = self.vx_des
@@ -101,6 +92,7 @@ class zmpEnv(gym.Env):
         self.updateVdes_count = 0
         self.resetJustNow = True
         self.stand_pos = np.zeros(2)
+        self.survival = 0
 
         return self._get_obs(),{}
     
@@ -123,22 +115,17 @@ class zmpEnv(gym.Env):
 
 #######################奖励##########################
         rewards = 0
-        rewards += self._reward_zmpTrace()*0
+        rewards += self._reward_zmpTrace()
         rewards += self._reward_action(action)
         rewards += self._reward_posFoot()*0
-        TenState_reward = self._reward_faraway()
-        rewards += TenState_reward*0
-        rewards += self._reward_velTrace()
+        rewards += self._reward_faraway()
+        rewards += self._reward_velTrace()*10
 
         self.count+=1
         if self.count > self.eposide:
             truncated = True
         else:
             truncated = False
-        if -TenState_reward > 50:
-            self.endEpisode = True
-        else:
-            self.endEpisode = False
         self.updateVdes_count+=1
         if self.updateVdes_count > 50:
             self.vx_des += np.random.uniform(-0.1,0.1)
@@ -152,8 +139,10 @@ class zmpEnv(gym.Env):
 
         if self.endEpisode:
             rewards-=100
-        if truncated:
-            rewards+=100
+        # if truncated:
+        #     rewards+=100
+        self.survival+=1
+        rewards += 0.002*self.survival
         return self._get_obs(), rewards, self.endEpisode, truncated, {}
 
 
@@ -168,13 +157,18 @@ class zmpEnv(gym.Env):
         
     def _reward_faraway(self):
         TenState =np.concatenate([self._agent_state[:2] for _ in range(10)])
+        dist = np.linalg.norm(self.pos_horizon - TenState)
+        if dist > 3:
+            self.endEpisode = True
+        if dist < np.abs(self.vx_des)*1.5:
+            return 0
         return -np.linalg.norm(self.pos_horizon - TenState)
     
     def _reward_velTrace(self):
         vel_des = np.concatenate([np.array([self.vx_des,0]) for _ in range(10)])
         vel_state = np.concatenate([self.state_Horizon[6*i+2:6*i+4] for i in range(10)])
         max_velDist = np.linalg.norm(vel_des - vel_state)
-        if max_velDist > 30:
+        if max_velDist > 7:
             self.endEpisode = True
         return np.exp(-np.linalg.norm(vel_des - vel_state))
     
@@ -268,8 +262,8 @@ class zmpEnv(gym.Env):
     def _draw_arrow(self, start, end, color = (0,100,100), width = 3):
         startLine = (self.bias[0] + start[0]*self.scale, self.bias[1] - start[1]*self.scale)
         endLine = (self.bias[0] + end[0]*self.scale, self.bias[1] - end[1]*self.scale)
-        if startLine[0] > self.window_size_w or startLine[1] > self.window_size_h or startLine[0] < 0 or startLine[1] < 0:
-            self.endEpisode = True
+        # if startLine[0] > self.window_size_w or startLine[1] > self.window_size_h or startLine[0] < 0 or startLine[1] < 0:
+        #     self.endEpisode = True
         pygame.draw.line(self.canvas, color, startLine, endLine, width)
         
 
@@ -289,14 +283,21 @@ def waitKey():
             listener.join()
 
 
-thread1 = threading.Thread(target=waitKey)
 
-thread1.start()
+render_enabled = True
+
 
 if __name__ == "__main__":
 
-    env = zmpEnv()
+    thread1 = threading.Thread(target=waitKey)
+    thread1.start()
+    current_file_path = __file__
+    absolute_path = os.path.dirname(current_file_path)
+    timeStamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    save_dir = absolute_path + f"/../models/{timeStamp}"
+    os.makedirs(save_dir,exist_ok=True)
 
+    env = zmpEnv()
     # check_env(env)
 
     policy_kwargs = dict(
@@ -305,14 +306,17 @@ if __name__ == "__main__":
     )
 
 
-    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= absolute_path+"/../tensorboard/")
-
-    model.learn(total_timesteps=6000000)
-
-    save_path = absolute_path+"/../models/zmpModel.pth"
-
-    torch.save(model.policy.state_dict(), save_path)
+    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= save_dir)
+    total_timesteps = 9000000  # 总训练步数
+    checkpoint_interval = total_timesteps/10  # 每隔多少步保存一次模型
+    timeSteps = 0
+    while timeSteps < total_timesteps:
+        model.learn(total_timesteps=checkpoint_interval,reset_num_timesteps=False)
+        timeSteps+=checkpoint_interval
+        save_path = save_dir+f"/zmpModel_{timeSteps}.pth"
+        torch.save(model.policy.state_dict(), save_path)
     
+
     print("策略网络结构：", model.policy.mlp_extractor.policy_net)
     print("价值网络结构：", model.policy.mlp_extractor.value_net)
 

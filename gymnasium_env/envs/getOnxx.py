@@ -3,12 +3,17 @@ import torch.nn as nn
 from stable_baselines3 import PPO
 from zmpEnv import zmpEnv
 import os
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("path", type=str, help="输入.pth文件的路径")
+args = parser.parse_args()
+
+
+
 
 current_file_path = __file__
 absolute_path = os.path.dirname(current_file_path)
-
-
-# 假设已加载和配置环境
 env = zmpEnv()
 policy_kwargs = dict(
     net_arch=dict(pi=[256, 256], vf=[128, 128]),
@@ -17,7 +22,7 @@ policy_kwargs = dict(
 
 # 创建模型并加载已保存的参数
 model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=1)
-load_path = absolute_path+"/../models/zmpModel.pth"
+load_path = args.path
 model.policy.load_state_dict(torch.load(load_path))
 model.policy.to("cpu")  # 将模型移动到 CPU
 model.policy.eval()     # 切换到评估模式

@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "getOnnx",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/user/rltrain/gymnasium_env/envs/getOnxx.py",
+            "console": "integratedTerminal",
+            "args": [
+                "/home/user/rltrain/gymnasium_env/models/20241101-170711/zmpModel_1800000.0.pth"
+            ]
+        },
+        {
+            "name": "play",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/user/rltrain/gymnasium_env/envs/play.py",
+            "console": "integratedTerminal",
+            "args": [
+                "/home/user/rltrain/gymnasium_env/models/20241101-170711/zmpModel_1800000.0.pth"
+            ]
+        },
+        {
+            "name": "train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/user/rltrain/gymnasium_env/envs/zmpEnv.py",
+            "console": "integratedTerminal",
+            "args": [
+                ""
+            ]
+        }
+    ]
+}
