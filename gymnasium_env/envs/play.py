@@ -17,6 +17,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     env = zmpEnv()
+    env.scale = 3*env.scale
     policy_kwargs = dict(
         net_arch=dict(pi=[256, 256], vf=[128, 128]), 
         activation_fn=nn.ReLU             

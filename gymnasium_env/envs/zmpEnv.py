@@ -63,15 +63,17 @@ class zmpEnv(gym.Env):
         self.render_mode = "human"
         self.window = None
         self.clock = None
+        self.scale = 50
+
 
 
 
     def _get_obs(self):
         obs = np.zeros(6,dtype=np.float32)
-        obs[0] = self._agent_state[2]
-        obs[1] = self._agent_state[3]
+        obs[0] = self._agent_state[2] + np.random.uniform(-0.2,0.2)
+        obs[1] = self._agent_state[3] + np.random.uniform(-0.2,0.2)
         obs[2] = self._agent_state[4]
-        obs[3] = self._agent_state[5]
+        obs[3] = self._agent_state[5] 
         obs[4] = self.vx_des
         obs[5] = self.timePoint
         return obs
@@ -87,6 +89,9 @@ class zmpEnv(gym.Env):
         self.vx_max = 1.0
         self.vy_max = 1.0
         self.vx_des = np.random.uniform(low=-self.vx_max,high=self.vx_max)
+        self.flag_vx_des = np.random.random_integers(0,3)
+        if self.flag_vx_des == 0:
+            self.vx_des = 0
         self.count = 0
         self.endEpisode = False
         self.updateVdes_count = 0
@@ -98,7 +103,7 @@ class zmpEnv(gym.Env):
     
     def step(self, action):
         # 对action进行缩放
-        action = action*10
+        action = action
         stateTemp = self._agent_state.reshape(6,1)
         zmpState = np.zeros(2,dtype=np.float32)
         for i in range(0,self.h):
@@ -127,13 +132,18 @@ class zmpEnv(gym.Env):
         else:
             truncated = False
         self.updateVdes_count+=1
-        if self.updateVdes_count > 50:
-            self.vx_des += np.random.uniform(-0.1,0.1)
-            self.updateVdes_count = 0
-        while self.vx_des > self.vx_max-0.2:
-            self.vx_des -= 0.1
-        while self.vx_des < -self.vx_max-0.2:
-            self.vx_des += 0.1
+        if self.flag_vx_des == 1:
+            if self.updateVdes_count > 10:
+                flag_vx_des = np.random.random_integers(0,4)
+                if flag_vx_des==0:
+                    self.vx_des = 0
+                else:
+                    self.vx_des += np.random.uniform(-0.3,0.3)
+                self.updateVdes_count = 0
+            while self.vx_des > self.vx_max:
+                self.vx_des -= 0.1
+            while self.vx_des < -self.vx_max:
+                self.vx_des += 0.1
         if self.render_mode == "human" and render_enabled:
             self._render_frame()
 
@@ -198,8 +208,8 @@ class zmpEnv(gym.Env):
                 self.footStep[i*2] = self.stand_pos[0]
                 self.footStep[i*2+1] = self.stand_pos[1]
             else:
-                self.footStep[i*2] = x + self.vx_des*self.trajT/2*k + self.K_step*(vx - vx_des)*0
-                self.footStep[i*2+1] = self.hipWidth*(self.timeArray[(i+self.timePoint)%self.h]) + y + 0*self.trajT/2*k + self.K_step*(vy)*0
+                self.footStep[i*2] = x + vx*self.trajT/2*k + self.K_step*(vx - vx_des)
+                self.footStep[i*2+1] = self.hipWidth*(self.timeArray[(i+self.timePoint)%self.h]) + y + vy*self.trajT/2*k + self.K_step*(vy)
 
             self.foot_draw.append(np.array([self.footStep[i*2], self.footStep[i*2+1]]))
 
@@ -221,8 +231,6 @@ class zmpEnv(gym.Env):
             self.clock = pygame.time.Clock()
         
         self.bias = np.array([self.window_size_w / 2, self.window_size_h/2])
-        # 216个像素表示1000mm
-        self.scale = 50
         # 刷新画布
         self.canvas = pygame.Surface((self.window_size_w, self.window_size_h))
         self.canvas.fill((255, 255, 255))
@@ -307,7 +315,7 @@ if __name__ == "__main__":
 
 
     model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= save_dir)
-    total_timesteps = 9000000  # 总训练步数
+    total_timesteps = 900000  # 总训练步数
     checkpoint_interval = total_timesteps/10  # 每隔多少步保存一次模型
     timeSteps = 0
     while timeSteps < total_timesteps:
