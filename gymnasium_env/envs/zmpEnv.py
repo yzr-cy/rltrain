@@ -69,7 +69,6 @@ class zmpEnv(gym.Env):
         self.endEpisode = False
         self.window_size_h = 1024
         self.window_size_w = 512*3
-
         self.render_mode = "human"
         self.window = None
         self.clock = None
@@ -89,37 +88,25 @@ class zmpEnv(gym.Env):
     def reset(self, seed=None):
         super().reset(seed=seed)
         self._agent_state = np.zeros((6,1),dtype=np.float32)
-        # self._agent_state[:2,0] = np.random.uniform(low=np.array([-100,-1], dtype=np.float32), 
-        #                                             high=np.array([100,1], dtype=np.float32), 
-        #                                             size=(2,))
         self._agent_state[:2,0] = np.array([0,0])
         self._agent_state[2:,0] = np.random.uniform(low=np.array([-1,-1,-1,-1],dtype=np.float32), 
                                                   high=np.array([1,1,1,1], dtype=np.float32), 
                                                   size=(4,))
-        
         self.timePoint = np.random.randint(0,self.h)
-
         self.vx_max = 1.0
-
         self.vy_max = 1.0
-
         self.vx_des = np.random.uniform(low=-self.vx_max,high=self.vx_max)
-
         self.count = 0
-
         self.endEpisode = False
-
         self.updateVdes_count = 0
+        self.resetJustNow = True
+        self.stand_pos = np.zeros(2)
 
-        
         return self._get_obs(),{}
     
     def step(self, action):
-
-
         # 对action进行缩放
         action = action*10
-
         stateTemp = self._agent_state.reshape(6,1)
         zmpState = np.zeros(2,dtype=np.float32)
         for i in range(0,self.h):
@@ -127,55 +114,46 @@ class zmpEnv(gym.Env):
             stateTemp = self.A * stateTemp + self.B * action[i*2:i*2+2].reshape(2,1)
             self.state_Horizon[i*6:i*6+6] = stateTemp.squeeze()
             self.zmp_Horizon[i*2:i*2+2] = zmpState.squeeze()
-        
         self.generate_Foot()
         self.timePoint = self.timePoint + 1
         if self.timePoint == self.h:
             self.timePoint = 0
-        
         self._agent_state = self.state_Horizon[:6]
         self.pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
+
+#######################奖励##########################
         rewards = 0
         rewards += self._reward_zmpTrace()*0
         rewards += self._reward_action(action)
         rewards += self._reward_posFoot()*0
-
         TenState_reward = self._reward_faraway()
         rewards += TenState_reward*0
-
         rewards += self._reward_velTrace()
-
 
         self.count+=1
         if self.count > self.eposide:
             truncated = True
         else:
             truncated = False
-
-
         if -TenState_reward > 50:
             self.endEpisode = True
-            rewards-=100
         else:
             self.endEpisode = False
-
         self.updateVdes_count+=1
         if self.updateVdes_count > 50:
             self.vx_des += np.random.uniform(-0.1,0.1)
             self.updateVdes_count = 0
-        
         while self.vx_des > self.vx_max-0.2:
             self.vx_des -= 0.1
         while self.vx_des < -self.vx_max-0.2:
             self.vx_des += 0.1
-
-
         if self.render_mode == "human" and render_enabled:
             self._render_frame()
 
-
-
-
+        if self.endEpisode:
+            rewards-=100
+        if truncated:
+            rewards+=100
         return self._get_obs(), rewards, self.endEpisode, truncated, {}
 
 
@@ -183,7 +161,7 @@ class zmpEnv(gym.Env):
         return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))
 
     def _reward_action(self, action):
-        return -np.linalg.norm(action)
+        return np.exp(-np.linalg.norm(action))
     
     def _reward_posFoot(self):
         return np.exp(-np.linalg.norm(self.footStep - self.pos_horizon))
@@ -195,12 +173,16 @@ class zmpEnv(gym.Env):
     def _reward_velTrace(self):
         vel_des = np.concatenate([np.array([self.vx_des,0]) for _ in range(10)])
         vel_state = np.concatenate([self.state_Horizon[6*i+2:6*i+4] for i in range(10)])
+        max_velDist = np.linalg.norm(vel_des - vel_state)
+        if max_velDist > 30:
+            self.endEpisode = True
         return np.exp(-np.linalg.norm(vel_des - vel_state))
     
     def generate_Foot(self):
         self.footStep = np.zeros(self.h*2, dtype=np.float32)
         k = 0
         self.foot_draw = []
+
         for i in range(0,self.h):
             x = self._agent_state[0]
             y = self._agent_state[1]
@@ -213,13 +195,23 @@ class zmpEnv(gym.Env):
             if i > 0:
                 if self.timeArray[(i+self.timePoint)%self.h] != self.timeArray[(i-1+self.timePoint)%self.h]:
                     k = k + 1
-            self.footStep[i*2] = x + vx * self.trajT / 2 * k + self.K_step * (vx - vx_des) * k
-            self.footStep[i*2+1] = self.hipWidth*(self.timeArray[(i+self.timePoint)%self.h]) + y + vy * self.trajT / 2 * k + self.K_step * (vy) * k
+            # 支撑脚应保持不动
+            if self.timePoint==0 or self.timePoint==5 or self.resetJustNow:
+                self.resetJustNow = False
+                self.stand_pos = np.array([x, self.hipWidth*(self.timeArray[self.timePoint]) + y])
+
+            if k == 0:
+                self.footStep[i*2] = self.stand_pos[0]
+                self.footStep[i*2+1] = self.stand_pos[1]
+            else:
+                self.footStep[i*2] = x + self.vx_des*self.trajT/2*k + self.K_step*(vx - vx_des)*0
+                self.footStep[i*2+1] = self.hipWidth*(self.timeArray[(i+self.timePoint)%self.h]) + y + 0*self.trajT/2*k + self.K_step*(vy)*0
+
             self.foot_draw.append(np.array([self.footStep[i*2], self.footStep[i*2+1]]))
 
     def render(self):
         if self.render_mode == "rgb_array":
-            return self._render_frame()
+            return self._render_frame() 
 
     def close(self):
         if self.window is not None:
@@ -236,7 +228,7 @@ class zmpEnv(gym.Env):
         
         self.bias = np.array([self.window_size_w / 2, self.window_size_h/2])
         # 216个像素表示1000mm
-        self.scale = 10
+        self.scale = 50
         # 刷新画布
         self.canvas = pygame.Surface((self.window_size_w, self.window_size_h))
         self.canvas.fill((255, 255, 255))
@@ -273,8 +265,7 @@ class zmpEnv(gym.Env):
             one_pos = pos[i]
             pygame.draw.circle(self.canvas, color= color, center=(self.bias[0] + one_pos[0]*self.scale,self.bias[1] - one_pos[1]*self.scale), radius=2)
 
-    def _draw_arrow(self, start, end, color = (0,255,255), width = 1):
-        """绘制箭头，宽度根据输入值决定箭头的大小"""
+    def _draw_arrow(self, start, end, color = (0,100,100), width = 3):
         startLine = (self.bias[0] + start[0]*self.scale, self.bias[1] - start[1]*self.scale)
         endLine = (self.bias[0] + end[0]*self.scale, self.bias[1] - end[1]*self.scale)
         if startLine[0] > self.window_size_w or startLine[1] > self.window_size_h or startLine[0] < 0 or startLine[1] < 0:
@@ -285,7 +276,6 @@ class zmpEnv(gym.Env):
 def on_press(key):
     try:
         if key.char == 'r':  # 检测按下 'q' 键
-            print("You pressed 'r'.")
             global render_enabled
             render_enabled = not render_enabled
             return False  # 返回 False 以停止监听
