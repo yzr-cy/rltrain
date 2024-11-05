@@ -100,7 +100,7 @@ class zmpEnv(gym.Env):
         # 对action进行缩放
         for i in range(10):
             action[i*2] = action[i*2]*0
-            action[i*2+1] = action[i*2+1]*0.3
+            action[i*2+1] = action[i*2+1]*0.1
 
         self.agent_state[2] = self.vx_des
         stateTemp = self.agent_state
@@ -180,7 +180,7 @@ class zmpEnv(gym.Env):
         puanish = np.linalg.norm(Y)
         Y = np.abs(pos_horizon[-1])
         puanish = Y
-        if np.abs(self.agent_state[1]) > 0.14:
+        if np.abs(self.agent_state[1]) > 0.05:
             self.endEpisode = True
         return -puanish
     
@@ -327,6 +327,10 @@ if __name__ == "__main__":
 
 
     model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= save_dir)
+
+    load_path = "/home/user/rltrain/gymnasium_env/models/20241105-191422/zmpModel_12000000.0.pth"
+    model.policy.load_state_dict(torch.load(load_path))
+
     total_timesteps = 20000000  # 总训练步数
     checkpoint_interval = total_timesteps/10  # 每隔多少步保存一次模型
     timeSteps = 0
