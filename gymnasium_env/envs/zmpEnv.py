@@ -28,31 +28,30 @@ class zmpEnv(gym.Env):
                                 #   1：表示左， -1：右
         self.timeArray = np.array([1,1,1,1,1,-1,-1,-1,-1,-1])
         self.timePoint = 0
-        self.A = np.matrix([[1,0,T,0,T*T/2,0],
-                            [0,1,0,T,0,T*T/2],
-                            [0,0,1,0,T,0],
-                            [0,0,0,1,0,T],
-                            [0,0,0,0,1,0],
-                            [0,0,0,0,0,1]])
+        self.A = np.matrix([[1,0,T,0],
+                            [0,1,0,T],
+                            [0,0,1,0],
+                            [0,0,0,1]])
         
-        self.B = np.matrix([[T*T*T/6, 0],
-                            [0, T*T*T/6],
-                           [T*T/2, 0],
+        self.B = np.matrix([[T*T/2, 0],
                            [0, T*T/2],
                            [T,0],
                            [0,T]])
         
-        self.C = np.matrix([[1,0,0,0,-zc/g,0],
-                            [0,1,0,0,0,-zc/g]])
+        self.C = np.matrix([[1,0,0,0],
+                            [0,1,0,0]])
+        
+        self.D = np.matrix([[-zc/g,0],
+                            [0,-zc/g]])
                                                         #    xdot,xddot,ydot,yddot,vx_des,timePoint
-        self.observation_space = spaces.Box(low = np.array([-10,-10,-10,-10,-1,0], dtype=np.float32),
-                                            high=np.array([10,10,10,10,1,self.h],dtype=np.float32),
+        self.observation_space = spaces.Box(low = np.array([-1,     0], dtype=np.float32),
+                                            high=np.array([  1,     self.h],dtype=np.float32),
                                             dtype=np.float32)
-                                                        #    ux0,uy0,...
+                            # ax0,ay0,...
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(20,), dtype=np.float32)
                             # 当前状态 x,y,xdot,ydot,xddot,yddot
-        self._agent_state = np.array([[0],[0],[0],[0],[0],[0]],dtype=np.float32)
-        self.state_Horizon = np.zeros(6*self.h, dtype=np.float32)
+        self.agent_state = np.array([[0],[0],[0],[0]],dtype=np.float32)
+        self.state_Horizon = np.zeros(4*self.h, dtype=np.float32)
         self.zmp_Horizon = np.zeros(2*self.h, dtype=np.float32)
         self.vx_des = 0
         self.eposide = 500
@@ -63,28 +62,24 @@ class zmpEnv(gym.Env):
         self.render_mode = "human"
         self.window = None
         self.clock = None
-        self.scale = 50
+        self.scale = 100
 
 
 
 
     def _get_obs(self):
-        obs = np.zeros(6,dtype=np.float32)
-        obs[0] = self._agent_state[2]
-        obs[1] = self._agent_state[3]
-        obs[2] = self._agent_state[4]
-        obs[3] = self._agent_state[5] 
-        obs[4] = self.vx_des
-        obs[5] = self.timePoint
+        obs = np.zeros(2,dtype=np.float32)
+        obs[0] = self.vx_des
+        obs[1] = self.timePoint
         return obs
     
     def reset(self, seed=None):
         super().reset(seed=seed)
-        self._agent_state = np.zeros((6,1),dtype=np.float32)
-        self._agent_state[:2,0] = np.array([0,0])
-        self._agent_state[2:,0] = np.random.uniform(low=np.array([-1,-1,-1,-1],dtype=np.float32), 
-                                                  high=np.array([1,1,1,1], dtype=np.float32), 
-                                                  size=(4,))
+        self.agent_state = np.zeros((4,1),dtype=np.float32)
+        # self.agent_state[:2,0] = np.array([0,0])
+        # self.agent_state[2:,0] = np.random.uniform(low=np.array([-1,-1,-1,-1],dtype=np.float32), 
+        #                                           high=np.array([1,1,1,1], dtype=np.float32), 
+        #                                           size=(4,))
         self.timePoint = np.random.randint(0,self.h)
         self.vx_max = 1.0
         self.vy_max = 1.0
@@ -103,32 +98,37 @@ class zmpEnv(gym.Env):
     
     def step(self, action):
         # 对action进行缩放
-        action = action
-        stateTemp = self._agent_state.reshape(6,1)
-        zmpState = np.zeros(2,dtype=np.float32)
+        for i in range(10):
+            action[i*2] = action[i*2]*0
+            action[i*2+1] = action[i*2+1]*0.3
+
+        self.agent_state[2] = self.vx_des
+        stateTemp = self.agent_state
+        action = action.reshape(20,1)
         for i in range(0,self.h):
-            zmpState = self.C * stateTemp
-            stateTemp = self.A * stateTemp + self.B * action[i*2:i*2+2].reshape(2,1)
-            self.state_Horizon[i*6:i*6+6] = stateTemp.squeeze()
+            zmpState = self.C * stateTemp + self.D * action[i*2:i*2+2]
+            stateTemp = self.A * stateTemp + self.B * action[i*2:i*2+2]
+            self.state_Horizon[i*4:i*4+4] = stateTemp.squeeze()
             self.zmp_Horizon[i*2:i*2+2] = zmpState.squeeze()
         self.generate_Foot()
         self.timePoint = self.timePoint + 1
         if self.timePoint == self.h:
             self.timePoint = 0
-        self._agent_state = self.state_Horizon[:6]
-        self.pos_horizon = np.concatenate([self.state_Horizon[6*i:6*i+2] for i in range(10)])
+        self.agent_state = self.state_Horizon[:4].reshape(4,1)
+        self.pos_horizon = np.concatenate([self.state_Horizon[4*i:4*i+2] for i in range(10)])
 
 #######################奖励##########################
         rewards = 0
         rewards += self._reward_zmpTrace()
         rewards += self._reward_action(action)
-        rewards += self._reward_posFoot()*0
-        rewards += self._reward_faraway()
-        rewards += self._reward_velTrace()*10
+        # rewards += self._reward_posFoot()*0
+        # rewards += self._reward_faraway()
+        rewards += self._reward_velTrace()*100
+        rewards += self._reward_y()*100
 
         self.count+=1
         if self.count > self.eposide:
-            truncated = True
+            truncated = True   
         else:
             truncated = False
         self.updateVdes_count+=1
@@ -138,7 +138,7 @@ class zmpEnv(gym.Env):
                 if flag_vx_des==0:
                     self.vx_des = 0
                 else:
-                    self.vx_des += np.random.uniform(-0.3,0.3)
+                    self.vx_des += np.random.uniform(-0.1,0.1)
                 self.updateVdes_count = 0
             while self.vx_des > self.vx_max:
                 self.vx_des -= 0.1
@@ -160,13 +160,13 @@ class zmpEnv(gym.Env):
         return np.exp(-(np.linalg.norm(self.footStep - self.zmp_Horizon)))
 
     def _reward_action(self, action):
-        return np.exp(-np.linalg.norm(action))
+        return np.exp(-np.linalg.norm(action)) + np.sum(action)
     
     def _reward_posFoot(self):
         return np.exp(-np.linalg.norm(self.footStep - self.pos_horizon))
         
     def _reward_faraway(self):
-        TenState =np.concatenate([self._agent_state[:2] for _ in range(10)])
+        TenState =np.concatenate([self.agent_state[:2] for _ in range(10)])
         dist = np.linalg.norm(self.pos_horizon - TenState)
         if dist > 3:
             self.endEpisode = True
@@ -174,24 +174,36 @@ class zmpEnv(gym.Env):
             return 0
         return -np.linalg.norm(self.pos_horizon - TenState)
     
+    def _reward_y(self):
+        pos_horizon = self.pos_horizon.reshape(20,1)
+        Y = np.concatenate([pos_horizon[2*i+1] for i in range(10)])
+        puanish = np.linalg.norm(Y)
+        Y = np.abs(pos_horizon[-1])
+        puanish = Y
+        if np.abs(self.agent_state[1]) > 0.14:
+            self.endEpisode = True
+        return -puanish
+    
     def _reward_velTrace(self):
         vel_des = np.concatenate([np.array([self.vx_des,0]) for _ in range(10)])
-        vel_state = np.concatenate([self.state_Horizon[6*i+2:6*i+4] for i in range(10)])
+        vel_state = np.concatenate([self.state_Horizon[4*i+2:4*i+4] for i in range(10)])
         max_velDist = np.linalg.norm(vel_des - vel_state)
         if max_velDist > 7:
             self.endEpisode = True
         return np.exp(-np.linalg.norm(vel_des - vel_state))
     
+    # def _reward_delta
+
     def generate_Foot(self):
         self.footStep = np.zeros(self.h*2, dtype=np.float32)
         k = 0
         self.foot_draw = []
 
         for i in range(0,self.h):
-            x = self._agent_state[0]
-            y = self._agent_state[1]
-            vx = self._agent_state[2]
-            vy = self._agent_state[3]
+            x = self.agent_state[0]
+            y = self.agent_state[1]
+            vx = self.agent_state[2]
+            vy = self.agent_state[3]
             if np.abs(vx) > self.vx_max or np.abs(vy) > self.vy_max:
                 self.endEpisode = True
 
@@ -244,7 +256,7 @@ class zmpEnv(gym.Env):
         for i in range(self.h):
             self.pos_draw.append(np.array([self.pos_horizon[i*2], self.pos_horizon[i*2+1]]))
         self._draw_circle(self.pos_draw)
-        self.CurrPos_Draw =[self._agent_state[:2]]
+        self.CurrPos_Draw =[self.agent_state[:2,0]]
         self._draw_circle(self.CurrPos_Draw,color=(0,0,255))
         self._draw_arrow(self.CurrPos_Draw[0], self.CurrPos_Draw[0] + np.array([self.vx_des,0]))
 
@@ -315,7 +327,7 @@ if __name__ == "__main__":
 
 
     model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= save_dir)
-    total_timesteps = 900000  # 总训练步数
+    total_timesteps = 20000000  # 总训练步数
     checkpoint_interval = total_timesteps/10  # 每隔多少步保存一次模型
     timeSteps = 0
     while timeSteps < total_timesteps:
