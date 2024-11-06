@@ -331,8 +331,8 @@ if __name__ == "__main__":
     load_path = "/home/user/rltrain/gymnasium_env/models/20241105-191422/zmpModel_12000000.0.pth"
     model.policy.load_state_dict(torch.load(load_path))
 
-    total_timesteps = 20000000  # 总训练步数
-    checkpoint_interval = total_timesteps/10  # 每隔多少步保存一次模型
+    total_timesteps = 50000000  # 总训练步数
+    checkpoint_interval = total_timesteps/100  # 每隔多少步保存一次模型
     timeSteps = 0
     while timeSteps < total_timesteps:
         model.learn(total_timesteps=checkpoint_interval,reset_num_timesteps=False)
