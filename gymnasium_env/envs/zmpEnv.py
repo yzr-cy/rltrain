@@ -328,7 +328,7 @@ if __name__ == "__main__":
 
     model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs,verbose=1,tensorboard_log= save_dir)
 
-    load_path = "/home/user/rltrain/gymnasium_env/models/20241105-191422/zmpModel_12000000.0.pth"
+    load_path = "/home/user/rltrain/gymnasium_env/models/20241105-224117/zmpModel_50000000.0.pth"
     model.policy.load_state_dict(torch.load(load_path))
 
     total_timesteps = 50000000  # 总训练步数
